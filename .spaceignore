@@ -1,0 +1,35 @@
+# Deta Space ignore file - keep upload small
+.venv
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+storage/
+*.log
+.git/
+.gitignore
+.env.local
+.env.development
+*.tmp
+*.temp
+node_modules/
+.DS_Store
+Thumbs.db
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Project specific
+ALL_PROJECT_CODE*.txt
+migrations/
+check_pgvector.py
+enable_pgvector.py

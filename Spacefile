@@ -1,0 +1,14 @@
+# Spacefile for PhotoVault deployment on Deta Space
+# Docs: https://go.deta.dev/docs/spacefile/v0
+v: 0
+app_name: "PhotoVault API (Demo)"
+icon: "./icon.png"
+micros:
+  - name: api
+    src: .
+    engine: python3.9
+    # Deta uses the 'dev' command to start Python apps
+    dev: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    # Configure resources for free tier
+    run_time: "python3.9"
+    # Environment will be set via Deta Space dashboard

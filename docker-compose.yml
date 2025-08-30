@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: photovault
+      POSTGRES_USER: photovault
+      POSTGRES_PASSWORD: photovault123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_pgvector.sql:/docker-entrypoint-initdb.d/init_pgvector.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U photovault -d photovault"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PhotoVault Backend
+  photovault:
+    build: .
+    ports:
+      - "8999:8999"
+    environment:
+      - DATABASE_URL=postgresql://photovault:photovault123@postgres:5432/photovault
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - MASTER_KEY=your-master-encryption-key-change-this-in-production
+      - APP_ENV=dev
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      - STORAGE_DIR=./storage
+      - EMBEDDINGS_PROVIDER=phash
+      - ENABLE_GEOCODER=true
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8999 --reload
+
+volumes:
+  postgres_data:
