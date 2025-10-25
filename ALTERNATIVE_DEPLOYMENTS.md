@@ -11,9 +11,6 @@ Since you have Neon PostgreSQL ready, here are other free deployment platforms:
 4. Set environment variables
 5. Deploy automatically
 
-### Environment Variables:
-```env
-DATABASE_URL=postgresql://neondb_owner:npg_A9gx3WksIXid@ep-purple-rice-ae4tzfq5-pooler.c-2.us-east-2.aws.neon.tech/neondb
 JWT_SECRET=your-super-secret-jwt-key
 MASTER_KEY=your-master-encryption-key
 APP_ENV=prod
@@ -106,7 +103,7 @@ Add platform-specific requirements
 
 ### 3. Environment Variables (for any platform):
 ```env
-DATABASE_URL=postgresql://neondb_owner:npg_A9gx3WksIXid@ep-purple-rice-ae4tzfq5-pooler.c-2.us-east-2.aws.neon.tech/neondb
+<!-- DATABASE_URL=postgresql://neondb_owner:npg_A9gx3WksIXid@ep-purple-rice-ae4tzfq5-pooler.c-2.us-east-2.aws.neon.tech/neondb -->
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 MASTER_KEY=your-master-encryption-key-change-this-in-production
 APP_ENV=prod

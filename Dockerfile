@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -22,11 +23,17 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Upgrade pip
+RUN python -m pip install --upgrade pip
+
 # Copy application code
 COPY . .
 
 # Create storage directory
 RUN mkdir -p storage
+
+# Create a virtual environment
+RUN python -m venv venv
 
 # Expose port
 EXPOSE 8999

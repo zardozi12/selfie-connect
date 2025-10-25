@@ -1,28 +1,37 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List
-from app.models.image import Image
-from app.models.album import Album, AlbumImage
+from fastapi import APIRouter, HTTPException, Depends
+from app.models.album import Album
+from app.models.user import User
+from app.services.qr import generate_qr_code
+from app.models.album import Album
+from app.models.album import AlbumImage
 from app.models.face import Face
 from app.models.user import PersonCluster
-from app.services.security import require_user, AuthUser
+from app.consolidated_services import require_user, AuthUser
 from app.services.album_service import AlbumService
 from app.schemas.image import AlbumOut, AlbumGroup, PersonClusterOut, ImageOut
-from tortoise.expressions import Q
-
+from app.services.ai_metadata_store import list_metadata
+import io
+from typing import List, Optional
+from uuid import UUID
+from fastapi.responses import StreamingResponse
+from app.models.image import Image
 
 router = APIRouter(prefix="/albums", tags=["albums"])
 
+@router.get("/{album_id}/qr")
+async def get_album_qr(album_id: UUID, auth: AuthUser = Depends(require_user)):
+    album = await Album.filter(id=album_id, user_id=auth.user_id).first()
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    qr_bytes = generate_qr_code(f"album:{album_id}")
+    return StreamingResponse(io.BytesIO(qr_bytes), media_type="image/png")
 
 @router.get("/", response_model=List[AlbumOut])
 async def list_albums(auth: AuthUser = Depends(require_user)):
-    """Get all albums for the user"""
     albums = await Album.filter(user_id=auth.user_id).prefetch_related("cover_image").all()
-    
-    result = []
+    result: List[AlbumOut] = []
     for album in albums:
-        # Get image count
         image_count = await AlbumImage.filter(album=album).count()
-        
         result.append(AlbumOut(
             id=album.id,
             name=album.name,
@@ -36,21 +45,16 @@ async def list_albums(auth: AuthUser = Depends(require_user)):
             is_auto_generated=album.is_auto_generated,
             cover_image_id=album.cover_image.id if album.cover_image else None,
             image_count=image_count,
-            created_at=album.created_at
+            created_at=album.created_at,
         ))
-    
     return result
-
 
 @router.get("/{album_id}", response_model=AlbumOut)
 async def get_album(album_id: str, auth: AuthUser = Depends(require_user)):
-    """Get a specific album with its images"""
     album = await Album.filter(id=album_id, user_id=auth.user_id).prefetch_related("cover_image").first()
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
-    
     image_count = await AlbumImage.filter(album=album).count()
-    
     return AlbumOut(
         id=album.id,
         name=album.name,
@@ -64,140 +68,112 @@ async def get_album(album_id: str, auth: AuthUser = Depends(require_user)):
         is_auto_generated=album.is_auto_generated,
         cover_image_id=album.cover_image.id if album.cover_image else None,
         image_count=image_count,
-        created_at=album.created_at
+        created_at=album.created_at,
     )
-
 
 @router.get("/{album_id}/images", response_model=List[ImageOut])
 async def get_album_images(album_id: str, auth: AuthUser = Depends(require_user)):
-    """Get all images in an album"""
-    # Verify album belongs to user
     album = await Album.filter(id=album_id, user_id=auth.user_id).first()
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
-    
-    # Get album images
     album_images = await AlbumImage.filter(album=album).prefetch_related("image").all()
-    
-    result = []
-    for album_img in album_images:
-        img = album_img.image
-        result.append(ImageOut(
-            id=img.id,
-            original_filename=img.original_filename,
-            width=img.width,
-            height=img.height,
-            gps_lat=img.gps_lat,
-            gps_lng=img.gps_lng,
-            location_text=img.location_text,
-            created_at=img.created_at
-        ))
-    
-    return result
-
+    return [
+        ImageOut(
+            id=a.image.id,
+            original_filename=a.image.original_filename,
+            width=a.image.width,
+            height=a.image.height,
+            gps_lat=a.image.gps_lat,
+            gps_lng=a.image.gps_lng,
+            location_text=a.image.location_text,
+            created_at=a.image.created_at,
+        )
+        for a in album_images if a.image
+    ]
 
 @router.post("/auto-generate")
 async def auto_generate_albums(auth: AuthUser = Depends(require_user)):
-    """Automatically generate albums based on location, date, and person clustering"""
     try:
         results = await AlbumService.auto_generate_all_albums(str(auth.user_id))
-        
         return {
             "message": "Albums generated successfully",
             "location_albums_created": len(results["location_albums"]),
             "date_albums_created": len(results["date_albums"]),
             "person_clusters_created": len(results["person_clusters"]),
-            "person_albums_created": len(results["person_albums"])
+            "person_albums_created": len(results["person_albums"]),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate albums: {str(e)}")
 
+@router.post("/auto-categorize")
+async def auto_categorize_albums(auth: AuthUser = Depends(require_user)):
+    """Automatically organize images into category albums using AI metadata."""
+    try:
+        # Collect metadata per image
+        meta_by_image = list_metadata(str(auth.user_id))
+        if not meta_by_image:
+            return {"message": "No AI metadata available yet", "created": []}
 
-@router.get("/by-location", response_model=List[AlbumGroup])
-async def albums_by_location(auth: AuthUser = Depends(require_user)):
-    """Get images grouped by location"""
-    images = await Image.filter(user_id=auth.user_id).all()
-    groups = {}
-    for i in images:
-        key = i.location_text or (f"{i.gps_lat:.5f},{i.gps_lng:.5f}" if i.gps_lat and i.gps_lng else "Unknown")
-        groups.setdefault(key, []).append(str(i.id))
-    
-    out = [AlbumGroup(key=k, count=len(v), image_ids=v) for k, v in groups.items()]
-    out.sort(key=lambda g: g.count, reverse=True)
-    return out
+        # Map category -> image_ids
+        groups: dict[str, List[str]] = {}
+        for image_id, meta in meta_by_image.items():
+            cats = meta.get("categories") or []
+            for c in cats:
+                key = c.strip().title()  # e.g., "people" -> "People"
+                groups.setdefault(key, []).append(image_id)
 
+        created_or_updated = []
+        for cat_name, image_ids in groups.items():
+            album, _ = await Album.get_or_create(user_id=auth.user_id, name=cat_name, defaults={"description": f"Auto {cat_name} album"})
+            # Add images
+            for iid in image_ids:
+                img = await Image.filter(id=iid, user_id=auth.user_id).first()
+                if img:
+                    exists = await AlbumImage.filter(album_id=album.id, image_id=img.id).exists()
+                    if not exists:
+                        await AlbumImage.create(album=album, image=img)
+            created_or_updated.append({"album": cat_name, "count": len(image_ids)})
 
-@router.get("/by-date", response_model=List[AlbumGroup])
-async def albums_by_date(auth: AuthUser = Depends(require_user)):
-    """Get images grouped by date (month/year)"""
-    images = await Image.filter(user_id=auth.user_id).order_by("-created_at").all()
-    groups = {}
-    for i in images:
-        if i.created_at:
-            key = i.created_at.strftime("%B %Y")  # e.g., "January 2024"
-            groups.setdefault(key, []).append(str(i.id))
-    
-    out = [AlbumGroup(key=k, count=len(v), image_ids=v) for k, v in groups.items()]
-    out.sort(key=lambda g: g.count, reverse=True)
-    return out
-
-
-@router.get("/persons", response_model=List[PersonClusterOut])
-async def get_person_clusters(auth: AuthUser = Depends(require_user)):
-    """Get all person clusters for the user"""
-    clusters = await PersonCluster.filter(user_id=auth.user_id).prefetch_related("faces").all()
-    
-    result = []
-    for cluster in clusters:
-        result.append(PersonClusterOut(
-            id=cluster.id,
-            label=cluster.label,
-            faces=len(cluster.faces)
-        ))
-    
-    return result
-
+        return {
+            "message": "Categorized albums updated",
+            "created_or_updated": created_or_updated,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to auto-categorize: {str(e)}")
 
 @router.post("/manual", response_model=AlbumOut)
 async def create_manual_album(
     name: str,
-    description: str = None,
-    image_ids: List[str] = None,
-    auth: AuthUser = Depends(require_user)
+    description: Optional[str] = None,
+    image_ids: Optional[List[str]] = None,
+    auth: AuthUser = Depends(require_user),
 ):
-    """Create a manual album"""
     if not name:
         raise HTTPException(status_code=400, detail="Album name is required")
-    
-    # Check if album name already exists
+
     existing = await Album.filter(user_id=auth.user_id, name=name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Album with this name already exists")
-    
-    # Create album
+
     album = await Album.create(
         user_id=auth.user_id,
         name=name,
         description=description,
         album_type="manual",
-        is_auto_generated=False
+        is_auto_generated=False,
     )
-    
-    # Add images if provided
+
     if image_ids:
         for image_id in image_ids:
-            # Verify image belongs to user
             image = await Image.filter(id=image_id, user_id=auth.user_id).first()
             if image:
                 await AlbumImage.create(album=album, image=image)
-    
-    # Set cover image if images were added
-    if image_ids:
+
         first_image = await Image.filter(id=image_ids[0], user_id=auth.user_id).first()
         if first_image:
             album.cover_image = first_image
             await album.save()
-    
+
     return AlbumOut(
         id=album.id,
         name=album.name,
@@ -211,71 +187,54 @@ async def create_manual_album(
         is_auto_generated=album.is_auto_generated,
         cover_image_id=album.cover_image.id if album.cover_image else None,
         image_count=len(image_ids) if image_ids else 0,
-        created_at=album.created_at
+        created_at=album.created_at,
     )
 
-
 @router.post("/{album_id}/add-images")
-async def add_images_to_album(
-    album_id: str,
-    image_ids: List[str],
-    auth: AuthUser = Depends(require_user)
-):
-    """Add images to an existing album"""
-    # Verify album belongs to user
+async def add_images_to_album(album_id: str, image_ids: List[str], auth: AuthUser = Depends(require_user)):
     album = await Album.filter(id=album_id, user_id=auth.user_id).first()
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
-    
-    added_count = 0
-    for image_id in image_ids:
-        # Verify image belongs to user
-        image = await Image.filter(id=image_id, user_id=auth.user_id).first()
-        if image:
-            # Check if already in album
-            existing = await AlbumImage.filter(album=album, image=image).first()
-            if not existing:
-                await AlbumImage.create(album=album, image=image)
-                added_count += 1
-    
-    return {"message": f"Added {added_count} images to album"}
 
+    added = 0
+    for iid in image_ids:
+        image = await Image.filter(id=iid, user_id=auth.user_id).first()
+        if not image:
+            continue
+        exists = await AlbumImage.filter(album=album, image=image).first()
+        if not exists:
+            await AlbumImage.create(album=album, image=image)
+            added += 1
+    return {"message": f"Added {added} images to album"}
+
+# ---------- NEW: alias so /add-image (singular) also works ----------
+@router.post("/{album_id}/add-image")
+async def add_image_alias(album_id: str, image_id: str, auth: AuthUser = Depends(require_user)):
+    return await add_images_to_album(album_id, [image_id], auth)
 
 @router.delete("/{album_id}/remove-images")
-async def remove_images_from_album(
-    album_id: str,
-    image_ids: List[str],
-    auth: AuthUser = Depends(require_user)
-):
-    """Remove images from an album"""
-    # Verify album belongs to user
+async def remove_images_from_album(album_id: str, image_ids: List[str], auth: AuthUser = Depends(require_user)):
     album = await Album.filter(id=album_id, user_id=auth.user_id).first()
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
-    
-    removed_count = 0
-    for image_id in image_ids:
-        image = await Image.filter(id=image_id, user_id=auth.user_id).first()
-        if image:
-            album_image = await AlbumImage.filter(album=album, image=image).first()
-            if album_image:
-                await album_image.delete()
-                removed_count += 1
-    
-    return {"message": f"Removed {removed_count} images from album"}
 
+    removed = 0
+    for iid in image_ids:
+        image = await Image.filter(id=iid, user_id=auth.user_id).first()
+        if not image:
+            continue
+        link = await AlbumImage.filter(album=album, image=image).first()
+        if link:
+            await link.delete()
+            removed += 1
+    return {"message": f"Removed {removed} images from album"}
 
 @router.delete("/{album_id}")
 async def delete_album(album_id: str, auth: AuthUser = Depends(require_user)):
-    """Delete an album (only manual albums can be deleted)"""
     album = await Album.filter(id=album_id, user_id=auth.user_id).first()
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
-    
     if album.is_auto_generated:
         raise HTTPException(status_code=400, detail="Cannot delete auto-generated albums")
-    
-    # Delete album (AlbumImage relationships will be deleted automatically due to CASCADE)
     await album.delete()
-    
     return {"message": "Album deleted successfully"}

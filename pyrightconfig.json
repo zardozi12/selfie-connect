@@ -1,0 +1,8 @@
+{
+  "venvPath": "D:/projects/photovault",
+  "venv": "venv",
+  "executionEnvironments": [
+    { "root": "D:/projects/photovault", "pythonVersion": "3.11" }
+  ],
+  "reportMissingImports": true
+}

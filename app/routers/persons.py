@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from uuid import UUID
 from app.models.face import Face
 from app.models.user import PersonCluster
-from app.services.security import require_user, AuthUser
+from app.consolidated_services import require_user, AuthUser
 from app.schemas.image import PersonClusterOut
 
 

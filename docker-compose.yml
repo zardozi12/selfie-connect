@@ -1,13 +1,24 @@
 version: '3.8'
 
 services:
+  # Redis for background jobs
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # PostgreSQL with pgvector extension
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_DB: photovault
       POSTGRES_USER: photovault
-      POSTGRES_PASSWORD: photovault123
+      POSTGRES_PASSWORD: 3660
     ports:
       - "5432:5432"
     volumes:
@@ -25,20 +36,30 @@ services:
     ports:
       - "8999:8999"
     environment:
-      - DATABASE_URL=postgresql://photovault:photovault123@postgres:5432/photovault
-      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-      - MASTER_KEY=your-master-encryption-key-change-this-in-production
-      - APP_ENV=dev
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
-      - STORAGE_DIR=./storage
-      - EMBEDDINGS_PROVIDER=phash
-      - ENABLE_GEOCODER=true
+      DATABASE_URL: "postgresql://photovault:3660@postgres:5432/photovault"
+      JWT_SECRET: "your-super-secret-jwt-key-change-this-in-production"
+      MASTER_KEY: "your-master-encryption-key-change-this-in-production"
+      APP_ENV: "dev"
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:8080"
+      STORAGE_DIR: "/app/storage"
+      EMBEDDINGS_PROVIDER: "phash"
+      ENABLE_GEOCODER: "true"
+      # NEW: Redis and monitoring
+      REDIS_URL: "redis://redis:6379/0"
+      SENTRY_DSN: ""
+      METRICS_ENABLED: "1"
     volumes:
       - ./storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8999 --reload
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        python init_db.py &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8999
+      "
 
 volumes:
   postgres_data:

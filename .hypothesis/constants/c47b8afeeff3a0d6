@@ -1,0 +1,4 @@
+# file: D:\photovault\app\services\embeddings.py
+# hypothesis_version: 6.138.16
+
+[1e-06, 512, 'RGB', 'clip']

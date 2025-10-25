@@ -2,7 +2,7 @@ from PIL import Image as PILImage, ExifTags
 from typing import Tuple, Dict, Any
 
 
-# Extract EXIF + GPS if available
+
 def extract_exif(path_or_bytes) -> tuple[dict | None, float | None, float | None, int | None, int | None]:
     try:
         if isinstance(path_or_bytes, (bytes, bytearray)):

@@ -1,24 +1,37 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.devcontainer/
+.hypothesis/
+.pytest_cache/
+*.log
+
+# Virtual environments
+.venv/
 venv/
-env/
-ENV/
-env.bak/
-venv.bak/
 
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
+# Databases and storage
+dev.db
+dev.db-*
+.test_db.sqlite3*
+storage/
+logs/
 
-# OS
+# Node/Next.js
+node_modules/
+.next/
+dist/
+.cache/
+
+# OS/Editor
 .DS_Store
 Thumbs.db
+.vscode/
+*.swp
+*.swo
 
 # Project specific
 storage/
@@ -35,3 +48,4 @@ ALL_PROJECT_CODE*.txt
 # Temporary files
 *.tmp
 *.temp
+node_modules

@@ -1,73 +1,90 @@
-import os
-from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
-from pydantic import AnyHttpUrl, field_validator
-from typing import List, Union, Tuple
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator, BaseModel
+from typing import List, Union
 
-# Robust .env loader: try multiple encodings without modifying the file
+# Load environment variables if python-dotenv is available
 try:
-    from dotenv import dotenv_values
-    env_path = ".env"
-    if os.path.exists(env_path):
-        for enc in ("utf-8", "utf-8-sig", "utf-16", "cp1252"):
-            try:
-                values = dotenv_values(env_path, encoding=enc)
-                if values:
-                    for k, v in values.items():
-                        if k and v is not None and k not in os.environ:
-                            os.environ[k] = str(v)
-                    break
-            except Exception:
-                continue
+    from dotenv import load_dotenv
+    load_dotenv()
 except Exception:
     pass
 
+class CsrfSettings(BaseModel):
+    secret_key: str
 
 class Settings(BaseSettings):
-    DATABASE_URL: str
-    APP_ENV: str = "dev"
-
-    JWT_SECRET: str
-    ACCESS_TOKEN_EXPIRES_MIN: int = 1440  # 24 hours for development
-    CORS_ORIGINS: Union[str, List[str]] = ""
-
+    # Database
+    DATABASE_URL: str = "postgres://user:password@localhost:5432/photovault"
+    # Security
+    JWT_SECRET: str = "dev-jwt-secret-change-me-very-long-32-chars-minimum"
+    CSRF_SECRET: str = "dev-csrf-secret-change-me-very-long-32-chars-min"
+    ACCESS_TOKEN_EXPIRES_MIN: int = 1440
+    MASTER_KEY: str = "dev-master-key-change-me-very-long-32-chars-min"
+    # App
+    APP_ENV: str = "development"
+    CORS_ORIGINS: Union[str, List[str]] = "http://localhost:3000,http://127.0.0.1:3000"
+    # ... existing code ...    # Security
+    JWT_SECRET: str = "dev-jwt-secret-change-me-very-long-32-chars-minimum"
+    CSRF_SECRET: str = "dev-csrf-secret-change-me-very-long-32-chars-min"
+    ACCESS_TOKEN_EXPIRES_MIN: int = 1440
+    MASTER_KEY: str = "dev-master-key-change-me-very-long-32-chars-min"
+    # App
+    APP_ENV: str = "development"
+    CORS_ORIGINS: Union[str, List[str]] = "http://localhost:3000,http://127.0.0.1:3000"
+    
+    # Storage
     STORAGE_DRIVER: str = "local"
     STORAGE_DIR: str = "./storage"
-
-    MASTER_KEY: str
-
+    
+    # AI/ML
     EMBEDDINGS_PROVIDER: str = "phash"
     CLIP_MODEL: str = "clip-ViT-B-32"
-
-    ENABLE_GEOCODER: bool = False  # Disabled for free deployment
-    GEOCODER_EMAIL: str | None = None
+    
+    # Features
+    ENABLE_GEOCODER: bool = True
+    GEOCODER_EMAIL: str = "photovault@example.com"
+    ENABLE_PGVECTOR: bool = False
+    
+    # Performance
+    MAX_UPLOAD_SIZE: str = "50MB"
+    THUMBNAIL_SIZE: int = 300
+    IMAGE_QUALITY: int = 85
+    
+    # Security
+    SESSION_TIMEOUT: int = 1440
+    MAX_LOGIN_ATTEMPTS: int = 5
+    RATE_LIMIT_REQUESTS: int = 100
+    RATE_LIMIT_WINDOW: int = 60
 
     @field_validator('CORS_ORIGINS', mode='before')
     @classmethod
     def parse_cors_origins(cls, v):
         if isinstance(v, str):
-            if v == "":
-                return []
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
         return v
 
-    # Do not let pydantic auto-load .env; rely on env and our manual loader
-    model_config = SettingsConfigDict(extra="ignore")
-
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls,
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> Tuple[PydanticBaseSettingsSource, ...]:
-        # Exclude dotenv_settings to prevent UnicodeDecodeError
-        return (
-            init_settings,  # kwargs passed to Settings()
-            env_settings,   # os.environ (includes our manual loader)
-            # file_secret_settings could be added back if needed
-        )
-
+    # Pydantic v2 config
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()
+
+TORTOISE_ORM = {
+    "connections": {
+        "default": settings.DATABASE_URL
+    },
+    "apps": {
+        "models": {
+            "models": [
+                "app.models.user",
+                "app.models.image", 
+                "app.models.album",
+                "app.models.face",
+                "app.models.share",
+                "aerich.models"
+            ],
+            "default_connection": "default",
+        }
+    },
+    "use_tz": True,  # Use timezone-aware datetimes
+    "timezone": "UTC",
+}

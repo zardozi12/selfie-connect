@@ -2,51 +2,13 @@
 
 A complete, free photo vault backend system built with FastAPI, PostgreSQL, and pgvector for automatic image organization, encryption, and intelligent classification.
 
-## 🚀 Features
-
-### Core Functionality
-- **Secure Image Upload & Storage**: Encrypted storage with user-specific encryption keys
-- **Automatic Album Generation**: Creates albums based on location, date, and person clustering
-- **Face Detection & Person Clustering**: Automatically groups photos by people
-- **Location-based Organization**: Extracts GPS data and organizes by location
-- **Free Cloud Storage**: Uses Cloudinary's free tier with local fallback
-- **Advanced Search**: Semantic search using pgvector embeddings
-- **Comprehensive Dashboard**: Analytics and insights about your photo collection
-
-### Security Features
-- **End-to-End Encryption**: Each user has their own encryption key
-- **Secure Authentication**: JWT-based authentication with Argon2 password hashing
-- **Encrypted Storage**: All images are encrypted before storage
-- **User Isolation**: Complete data separation between users
-
-### AI/ML Features
-- **Face Detection**: OpenCV-based face detection
-- **Person Clustering**: Groups similar faces using cosine similarity
-- **Image Embeddings**: CLIP or perceptual hash-based embeddings
-- **Semantic Search**: Find images by description using pgvector
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   FastAPI App   │    │   PostgreSQL    │    │   Cloudinary    │
-│                 │    │   + pgvector    │    │   (Free Tier)   │
-│ • Authentication│◄──►│ • User Data     │    │ • Image Storage │
-│ • Image Upload  │    │ • Images        │    │ • Encryption    │
-│ • Album Mgmt    │    │ • Albums        │    │ • Fallback      │
-│ • Search        │    │ • Face Data     │    │                 │
-│ • Dashboard     │    │ • Embeddings    │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
 ## 🛠️ Technology Stack
-
-- **Backend**: FastAPI + Python 3.11+
-- **Database**: PostgreSQL + pgvector extension
-- **ORM**: Tortoise ORM (async)
-- **Authentication**: JWT + Argon2
-- **Encryption**: Fernet (AES-128)
-- **Storage**: Cloudinary (free tier) + Local fallback
+- Backend: FastAPI + Python 3.11+
+- Database: PostgreSQL + pgvector extension
+- ORM: Tortoise ORM (async)
+- Authentication: JWT + Argon2
+- Encryption: Fernet (AES-128)
+- Storage: Cloudinary (free tier) + Local fallback
 - **AI/ML**: OpenCV, CLIP, Perceptual Hashing
 - **Search**: pgvector similarity search
 - **Migrations**: Aerich
@@ -56,33 +18,24 @@ A complete, free photo vault backend system built with FastAPI, PostgreSQL, and 
 ### Prerequisites
 - Python 3.11+
 - PostgreSQL 13+ with pgvector extension
-- Docker (optional)
 
 ### 1. Clone and Setup
 ```bash
-git clone <repository-url>
-cd photovault
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+cd d:\projects\photovault
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
 ### 2. Database Setup
 ```bash
-# Install pgvector extension
-# For Ubuntu/Debian:
-sudo apt-get install postgresql-13-pgvector
-
-# For macOS:
-brew install pgvector
-
-# Create database and enable extension
 createdb photovault
-psql photovault -c "CREATE EXTENSION vector;"
+psql -d photovault -c "CREATE EXTENSION IF NOT EXISTS vector;"
+psql -d photovault -f "d:\projects\photovault\scripts\create_image_embeddings_table.sql"
 ```
 
 ### 3. Environment Configuration
-Create a `.env` file:
+Create `.env`:
 ```env
 # Database
 DATABASE_URL=postgresql://username:password@localhost/photovault
@@ -116,7 +69,7 @@ python init_db.py
 
 ### 5. Start the Server
 ```bash
-uvicorn app.main:app --host 127.0.0.1 --port 8999 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ## 📚 API Documentation

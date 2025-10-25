@@ -13,6 +13,11 @@ class ImageOut(BaseModel):
     gps_lng: float | None = None
     location_text: str | None = None
     created_at: datetime | None = None
+    # AI/organization fields
+    tags: Optional[List[str]] = None
+    categories: Optional[List[str]] = None
+    contains_faces: Optional[bool] = None
+    face_count: Optional[int] = None
 
 
 class AlbumGroup(BaseModel):

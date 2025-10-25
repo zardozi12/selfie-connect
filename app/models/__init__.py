@@ -1,12 +1,16 @@
-from tortoise import fields
-from tortoise.models import Model
-import uuid
+# Import all models for Tortoise ORM registration
+from .base import BaseModel
+from .user import User, PersonCluster
+from .image import Image
+from .album import Album, AlbumImage
+from .face import Face
 
-
-class BaseModel(Model):
-    id = fields.UUIDField(pk=True, default=uuid.uuid4)
-    created_at = fields.DatetimeField(auto_now_add=True)
-    updated_at = fields.DatetimeField(auto_now=True)
-
-    class Meta:
-        abstract = True
+__all__ = [
+    "BaseModel",
+    "User",
+    "PersonCluster", 
+    "Image",
+    "Album",
+    "AlbumImage",
+    "Face"
+]

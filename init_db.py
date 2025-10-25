@@ -1,44 +1,32 @@
 #!/usr/bin/env python3
 """
-Database initialization script for PhotoVault
+Initialize PhotoVault database for Docker deployment
 """
+
 import asyncio
 import sys
-import os
+from pathlib import Path
 
-# Add the project root to Python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add the app directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent))
 
-from app.db import init_db, TORTOISE_ORM
-from tortoise import Tortoise
+from app.db import init_db, close_db
 
-
-async def setup_database():
-    """Initialize database and run migrations"""
-    print("Setting up database...")
+async def initialize_database():
+    """Initialize the database for Docker deployment"""
+    print("Initializing PhotoVault database...")
     
     try:
-        # Initialize Tortoise ORM
-        await Tortoise.init(config=TORTOISE_ORM)
-        
-        # Generate schemas
-        await Tortoise.generate_schemas()
-        print("✅ Database schemas generated successfully")
-        
-        # Close connections
-        await Tortoise.close_connections()
-        print("✅ Database setup completed")
-        
+        await init_db()
+        print("Database initialized successfully!")
+        return True
     except Exception as e:
-        print(f"❌ Database setup failed: {e}")
-        print("\nMake sure PostgreSQL is running and accessible.")
-        print("You can start it with: docker compose up -d db")
+        print(f"Database initialization failed: {e}")
         return False
-    
-    return True
-
+    finally:
+        await close_db()
 
 if __name__ == "__main__":
-    success = asyncio.run(setup_database())
+    success = asyncio.run(initialize_database())
     if not success:
         sys.exit(1)

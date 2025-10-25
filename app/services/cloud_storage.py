@@ -16,21 +16,22 @@ class CloudinaryStorage:
         self.api_secret = os.getenv("CLOUDINARY_API_SECRET", "demo")
         self.base_url = f"https://api.cloudinary.com/v1_1/{self.cloud_name}"
     
-    async def save(self, user_id: str, filename: str, data: bytes) -> str:
+    async def save(self, user_id: str, filename: str, data: bytes, folder: str | None = None) -> str:
         """Save encrypted image data to Cloudinary"""
         try:
             # Encode data as base64
             encoded_data = base64.b64encode(data).decode('utf-8')
             
             # Create unique public_id for the image
-            public_id = f"photovault/{user_id}/{filename}"
+            base = f"photovault/{user_id}"
+            public_id = f"{base}/{folder}/{filename}" if folder else f"{base}/{filename}"
             
             # Prepare upload data
             upload_data = {
                 'file': f'data:application/octet-stream;base64,{encoded_data}',
                 'public_id': public_id,
                 'resource_type': 'auto',
-                'folder': f'photovault/{user_id}',
+                'folder': base if folder is None else f"{base}/{folder}",
                 'access_mode': 'authenticated'  # Requires authentication to access
             }
             
@@ -54,6 +55,15 @@ class CloudinaryStorage:
     
     async def read(self, storage_key: str) -> bytes:
         """Read encrypted image data from Cloudinary"""
+        # Validate storage_key to prevent path traversal
+        if not storage_key or ".." in storage_key or storage_key.startswith("/"):
+            raise ValueError("Invalid storage key")
+        
+        # Ensure storage_key only contains safe characters
+        import re
+        if not re.match(r'^[a-zA-Z0-9/_.-]+$', storage_key):
+            raise ValueError("Storage key contains invalid characters")
+        
         try:
             # Download from Cloudinary
             download_url = f"https://res.cloudinary.com/{self.cloud_name}/image/upload/{storage_key}"
@@ -93,6 +103,31 @@ class CloudinaryStorage:
         except Exception:
             return False
 
+    async def move_to_folder(self, storage_key: str, new_folder: str) -> str:
+        """Move encrypted file to a new folder"""
+        # Validate inputs to prevent path traversal
+        if not storage_key or ".." in storage_key or storage_key.startswith("/"):
+            raise ValueError("Invalid storage key")
+        if not new_folder or ".." in new_folder or new_folder.startswith("/"):
+            raise ValueError("Invalid folder name")
+        
+        # storage_key like "photovault/<userId>/.../filename"
+        parts = storage_key.split("/")
+        if len(parts) < 3 or parts[0] != "photovault":
+            raise ValueError(f"Unexpected storage_key: {storage_key}")
+        user_id = parts[1]
+        filename = parts[-1]
+        
+        # Validate filename
+        import re
+        if not re.match(r'^[a-zA-Z0-9_.-]+$', filename):
+            raise ValueError("Invalid filename")
+
+        data = await self.read(storage_key)           # encrypted bytes
+        new_key = await self.save(user_id, filename, data, folder=new_folder)
+        await self.delete(storage_key)                # best-effort
+        return new_key
+
 
 # Create a hybrid storage that tries cloud first, falls back to local
 class HybridStorage:
@@ -100,15 +135,15 @@ class HybridStorage:
     
     def __init__(self):
         self.cloud_storage = CloudinaryStorage()
-        from app.services.storage import storage
-        self.local_storage = storage
+        from app.services.storage import LocalStorage
+        self.local_storage = LocalStorage()
     
     async def save(self, user_id: str, filename: str, data: bytes) -> str:
         """Save to cloud storage, fallback to local"""
         try:
             return await self.cloud_storage.save(user_id, filename, data)
         except Exception:
-            # Fallback to local storage
+            # Fallback to local storage (not async)
             return self.local_storage.save(user_id, filename, data)
     
     async def read(self, storage_key: str) -> bytes:
@@ -116,7 +151,7 @@ class HybridStorage:
         try:
             return await self.cloud_storage.read(storage_key)
         except Exception:
-            # Fallback to local storage
+            # Fallback to local storage (not async)
             return self.local_storage.read(storage_key)
     
     async def delete(self, storage_key: str) -> bool:
@@ -146,10 +181,20 @@ class HybridStorage:
             # Fallback to local storage
             return self.local_storage.exists(storage_key)
 
+    async def save_in_folder(self, user_id: str, folder: str, filename: str, data: bytes) -> str:
+        """Save to cloud storage in specific folder, fallback to local"""
+        try:
+            return await self.cloud_storage.save(user_id, filename, data, folder=folder)
+        except Exception:
+            return self.local_storage.save_in_folder(user_id, folder, filename, data)
 
-# Import the new Deta-compatible storage
-try:
-    from app.services.deta_storage import storage
-except ImportError:
-    # Fallback to original hybrid storage if Deta not available
-    storage = HybridStorage()
+    async def move_to_folder(self, storage_key: str, new_folder: str) -> str:
+        """Move encrypted file to new folder"""
+        try:
+            return await self.cloud_storage.move_to_folder(storage_key, new_folder)
+        except Exception:
+            return self.local_storage.move_to_folder(storage_key, new_folder)
+
+
+# Use hybrid storage as default
+storage = HybridStorage()
