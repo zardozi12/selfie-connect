@@ -1,4 +1,167 @@
-# PhotoVault Backend - University Demo
+# # PhotoVault (Selfie Connect)
+
+A secure, feature-rich photo management system with face recognition, secure sharing, and album organization capabilities.
+
+## Features
+
+- 🔐 **Secure Authentication**
+  - Email/Password signup and login
+  - JWT-based session management
+  - Optional face recognition login
+
+- 📸 **Photo Management**
+  - Upload and organize photos
+  - Automatic face detection
+  - Image optimization and compression
+  - EXIF metadata preservation
+  - Folder organization
+
+- 👥 **Face Recognition**
+  - Automatic face detection
+  - Face embedding generation
+  - Similar face grouping
+  - Person-based organization
+
+- 🔄 **Sharing Features**
+  - Secure sharing via QR codes
+  - One-time password protection
+  - Time-limited access links
+  - Album sharing
+
+- 🔍 **Advanced Search**
+  - Face-based search
+  - Similar image finding
+  - Metadata-based filtering
+  - Location-based search (if GPS data available)
+
+## Tech Stack
+
+### Backend
+- Python 3.10+
+- FastAPI
+- Tortoise ORM
+- PostgreSQL/SQLite
+- OpenCV
+- face_recognition (optional)
+- PIL/Pillow
+
+### Frontend
+- Next.js 13+
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui components
+
+## Installation
+
+### Prerequisites
+- Python 3.10 or higher
+- Node.js 16.14 or higher
+- PostgreSQL (optional, SQLite works too)
+- Git
+
+### Backend Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/zardozi12/selfie-connect.git
+   cd selfie-connect
+   ```
+
+2. Create virtual environment:
+   ```bash
+   python -m venv .venv
+   .\.venv\Scripts\activate  # Windows
+   source .venv/bin/activate # Linux/Mac
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Set up environment variables:
+   ```bash
+   cp env.example .env
+   # Edit .env with your settings
+   ```
+
+5. Initialize database:
+   ```bash
+   python -m aerich init-db
+   ```
+
+### Frontend Setup
+1. Navigate to frontend directory:
+   ```bash
+   cd photovaultfrontend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment:
+   ```bash
+   cp .env.example .env.local
+   # Edit .env.local if needed
+   ```
+
+## Running the Application
+
+### Start Backend
+```bash
+cd photovault
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8999
+```
+
+### Start Frontend
+```bash
+cd photovaultfrontend
+npm run dev
+```
+
+Access the application at http://localhost:3000
+
+## API Documentation
+- Swagger UI: http://127.0.0.1:8999/docs
+- ReDoc: http://127.0.0.1:8999/redoc
+
+## Testing
+```bash
+# Run backend tests
+pytest
+
+# Run frontend tests
+cd photovaultfrontend
+npm test
+```
+
+## Configuration
+
+### Backend Settings (.env)
+- `DATABASE_URL`: Database connection string
+- `JWT_SECRET`: Secret for JWT tokens
+- `STORAGE_DRIVER`: 'local' or 's3'
+- `FACE_RECOGNITION_ENABLED`: Enable/disable face recognition
+- `EMBEDDINGS_PROVIDER`: 'none' or 'clip'
+
+### Frontend Settings (.env.local)
+- `NEXT_PUBLIC_API_URL`: Backend API URL
+- `NEXT_PUBLIC_STORAGE_URL`: Media storage URL
+
+## Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+MIT License
+
+## Authors
+- Original development by Selfie Connect team Backend - University Demo
 
 A complete, free photo vault backend system built with FastAPI, PostgreSQL, and pgvector for automatic image organization, encryption, and intelligent classification.
 
