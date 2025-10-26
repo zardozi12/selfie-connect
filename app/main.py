@@ -219,3 +219,9 @@ app.openapi = custom_openapi
 @app.get("/metrics")
 async def prometheus_metrics():
     return await metrics_endpoint()
+
+# Universal health endpoint (always present)
+@app.get("/health")
+async def health():
+    from datetime import datetime
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}

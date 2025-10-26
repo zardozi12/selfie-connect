@@ -14,7 +14,9 @@ def safe_cosine(a, b) -> float:
             if n1 == 0.0 and n2 == 0.0:
                 return 1.0
             return 0.0
-        return sum(x*y for x, y in zip(a, b)) / (n1 * n2)
+        result = sum(x * y for x, y in zip(a, b)) / (n1 * n2)
+        # Clamp to [-1.0, 1.0] to avoid floating-point overshoot
+        return max(-1.0, min(1.0, result))
     except Exception:
         return 0.0
 

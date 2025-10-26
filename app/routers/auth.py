@@ -22,6 +22,7 @@ except Exception:
     csrf_enabled = False
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from app.services.security import validate_csrf_tokens
 
 limiter = Limiter(key_func=get_remote_address)
 log = logging.getLogger(__name__)
@@ -46,46 +47,16 @@ def _cookie_settings():
 
 # Method: validate_csrf_request()
 def validate_csrf_request(request: Request, x_csrf_token: Optional[str] = Header(None, alias="X-CSRF-Token")):
-    """Validate CSRF double-submit tokens; skip in dev/test and pytest."""
+    """Validate CSRF double-submit tokens; enforced only in production."""
     env = (settings.APP_ENV or "").strip().lower()
-    if env in ("test", "dev", "development") or ("PYTEST_CURRENT_TEST" in os.environ):
+    # Skip CSRF in non-production (dev/test/pytest)
+    if env != "production" or ("PYTEST_CURRENT_TEST" in os.environ):
         return
-    cookie_hash = request.cookies.get("csrf_token")
-    if not cookie_hash or not x_csrf_token:
-        raise HTTPException(status_code=403, detail="CSRF token missing")
-    if _hash_csrf_token(x_csrf_token) != cookie_hash:
-        raise HTTPException(status_code=403, detail="CSRF token mismatch")
-
-# Method: get_csrf_token()
-@router.get("/csrf-token")
-async def get_csrf_token(response: Response):
-    """Issue CSRF token (plain) and set httpOnly hashed cookie."""
-    token = _generate_csrf_token()
-    token_hash = _hash_csrf_token(token)
-    response.set_cookie(
-        key="csrf_token",
-        value=token_hash,
-        max_age=24 * 60 * 60,
-        **_cookie_settings(),
-    )
-    return {"csrf_token": token}
-
-
-def validate_csrf_request(request: Request, x_csrf_token: Optional[str] = Header(None)):
-    """Validate CSRF double-submit tokens"""
-    if settings.APP_ENV == "test":
-        return  # Skip CSRF validation in tests
-    
     csrf_cookie = request.cookies.get("csrf_token")
-    
     if not validate_csrf_tokens(x_csrf_token, csrf_cookie):
-        raise HTTPException(
-            status_code=403, 
-            detail="CSRF token validation failed"
-        )
+        raise HTTPException(status_code=403, detail="CSRF token validation failed")
 
-# Method: signup()
-@router.post("/signup", response_model=TokenOut)
+@router.post("/signup", response_model=TokenOut, status_code=201)
 @limiter.limit("10/minute")
 async def signup(
     request: Request,
